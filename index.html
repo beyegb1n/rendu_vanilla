@@ -1,0 +1,280 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      .main {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+      }
+
+      .courses-actions-container {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .internal-link {
+        cursor: pointer;
+        text-decoration: underline;
+        color: blue;
+      }
+
+      .professor {
+        font-weight: bold;
+      }
+
+      .student {
+        font-style: italic;
+      }
+
+      .details {
+        visibility: hidden;
+        border: 1pt solid black;
+        padding: 10px;
+      }
+
+      .details.selected {
+        visibility: visible;
+      }
+    </style>
+    <script src="./scripts/classes.js"></script>
+    <script>
+      const courses = [];
+      const rooms = [];
+      let currentCourse = null;
+      let listCourses, roomSelect;
+
+      function displayCourses() {
+        clearCourses();
+        courses.forEach((course) => {
+          const listItem = document.createElement("li");
+          const linkDetails = document.createElement("span");
+
+          linkDetails.classList.add("internal-link");
+          linkDetails.innerText = course.title;
+
+          linkDetails.addEventListener("click", () => {
+            currentCourse = course;
+            displayCurrentCourse();
+          });
+
+          listItem.appendChild(linkDetails);
+          listCourses.appendChild(listItem);
+        });
+      }
+
+      function clearCourses() {
+        while (listCourses.firstChild) {
+          listCourses.removeChild(listCourses.firstChild);
+        }
+      }
+
+      function displayCurrentCourse() {
+        const courseTitle = document.getElementById("courseTitle");
+        const listPersons = document.getElementById("listPersons");
+        const detailsDiv = document.querySelector(".details");
+
+        if (!currentCourse) {
+          courseTitle.innerText = "";
+          listPersons.innerHTML = "";
+          detailsDiv.classList.remove("selected");
+          return;
+        }
+
+        courseTitle.innerText = currentCourse.title;
+        listPersons.innerHTML = "";
+        detailsDiv.classList.add("selected");
+
+        currentCourse.persons.forEach((person) => {
+          const listItem = document.createElement("li");
+
+          if (person instanceof Professor) {
+            listItem.classList.add("professor");
+            listItem.innerText = `${person.name} (Professeur)`;
+          } else if (person instanceof Student) {
+            listItem.classList.add("student");
+            listItem.innerText = `${person.name} (Étudiant)`;
+          }
+
+          const button = document.createElement("button");
+          button.innerText = "Bonjour";
+          button.onclick = () => alert(person.direBonjour());
+          listItem.appendChild(button);
+
+          listPersons.appendChild(listItem);
+        });
+      }
+
+      function addCourse() {
+        const txtCourseTitle = document.getElementById("txtCourseTitle");
+        const courseTitle = txtCourseTitle.value.trim();
+
+        if (courseTitle) {
+          if (courses.some((course) => course.title === courseTitle)) {
+            alert("Ce cours existe déjà !");
+          } else {
+            const course = new Course(courseTitle);
+            courses.push(course);
+            storeCourses();
+            displayCourses();
+          }
+        } else {
+          alert("Le titre du cours est obligatoire !");
+        }
+      }
+
+      function addProfessor() {
+        if (!currentCourse) return alert("Aucun cours sélectionné.");
+
+        const existingProf = currentCourse.persons.find(
+          (person) => person instanceof Professor
+        );
+
+        if (existingProf) {
+          return alert(
+            `Ce cours a déjà un professeur : ${existingProf.name}. Vous ne pouvez pas en ajouter un autre.`
+          );
+        }
+
+        let name = "";
+        let teaches = "";
+
+        while (!name) {
+          name = prompt("Nom du professeur :")?.trim();
+          if (!name) alert("Le nom du professeur est obligatoire !");
+        }
+
+        while (!teaches) {
+          teaches = prompt("Matière enseignée :")?.trim();
+          if (!teaches) alert("La matière enseignée est obligatoire !");
+        }
+
+        const professor = new Professor(name, teaches);
+        currentCourse.persons.push(professor);
+        storeCourses();
+        displayCurrentCourse();
+      }
+
+      function addStudent() {
+        if (!currentCourse) return alert("Aucun cours sélectionné.");
+
+        let name = "";
+        let year = "";
+
+        while (!name) {
+          name = prompt("Nom de l'étudiant :")?.trim();
+          if (!name) alert("Le nom de l'étudiant est obligatoire !");
+        }
+
+        while (!year) {
+          year = prompt("Année :")?.trim();
+          if (!year) alert("L'année de l'étudiant est obligatoire !");
+        }
+
+        const student = new Student(name, year);
+        currentCourse.persons.push(student);
+        storeCourses();
+        displayCurrentCourse();
+      }
+
+      function addRoom() {
+        const roomName = prompt("Nom de la salle :")?.trim();
+
+        if (roomName && !rooms.includes(roomName)) {
+          rooms.push(roomName);
+          refreshRoomSelect();
+          storeCourses();
+        } else {
+          alert("Cette salle existe déjà ou est invalide !");
+        }
+      }
+
+      function refreshRoomSelect() {
+        roomSelect.innerHTML =
+          '<option value="">-- Toutes les salles --</option>';
+        rooms.forEach((room) => {
+          const option = document.createElement("option");
+          option.value = room;
+          option.textContent = room;
+          roomSelect.appendChild(option);
+        });
+      }
+
+      function storeCourses() {
+        localStorage.setItem(
+          "courses",
+          JSON.stringify(courses.map((c) => c.toJSON()))
+        );
+        localStorage.setItem("rooms", JSON.stringify(rooms));
+      }
+
+      function retrieveCourses() {
+        const strCourses = localStorage.getItem("courses");
+        const storedRooms = localStorage.getItem("rooms");
+
+        if (strCourses) {
+          const jsonCourses = JSON.parse(strCourses);
+          jsonCourses.forEach((jsonCourse) => {
+            const course = new Course("");
+            course.fromJSON(jsonCourse);
+            courses.push(course);
+          });
+        }
+
+        if (storedRooms) {
+          rooms.push(...JSON.parse(storedRooms));
+          refreshRoomSelect();
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        listCourses = document.getElementById("listCourses");
+        roomSelect = document.getElementById("roomSelect");
+
+        document
+          .getElementById("btnAddCourse")
+          .addEventListener("click", addCourse);
+        document
+          .getElementById("btnAddProf")
+          .addEventListener("click", addProfessor);
+        document
+          .getElementById("btnAddStud")
+          .addEventListener("click", addStudent);
+        document
+          .getElementById("btnAddRoom")
+          .addEventListener("click", addRoom);
+
+        retrieveCourses();
+        displayCourses();
+      });
+    </script>
+  </head>
+
+  <body>
+    <div class="main">
+      <div class="courses">
+        <ul id="listCourses"></ul>
+        <div class="courses-actions-container">
+          <label>Titre</label>
+          <input type="text" id="txtCourseTitle" />
+          <button id="btnAddCourse">Ajouter un cours</button>
+        </div>
+      </div>
+
+      <div class="details">
+        <h1 id="courseTitle"></h1>
+        <ul id="listPersons"></ul>
+        <button id="btnAddProf">Ajouter un professeur</button>
+        <button id="btnAddStud">Ajouter un étudiant</button>
+
+        <div>
+          <h2>Gestion des salles</h2>
+          <button id="btnAddRoom">Ajouter une salle</button>
+          <label for="roomSelect">Sélectionner une salle :</label>
+          <select id="roomSelect">
+            <option value="">Toutes les salles</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
